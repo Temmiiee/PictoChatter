@@ -172,6 +172,16 @@ const initDB = async () => {
       WHERE m.channel_id IS NULL AND m.room_id IS NOT NULL;
     `);
 
+    // Migration: Add position to channels if missing
+    await pool.query(`
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='channels' AND column_name='position') THEN
+          ALTER TABLE channels ADD COLUMN position INTEGER DEFAULT 0;
+        END IF;
+      END $$;
+    `);
+
     console.log('✅ Database initialized and migrated');
   } catch (err) {
     console.error('❌ Database initialization error:', err);
@@ -488,6 +498,8 @@ app.delete('/api/rooms/:roomId', async (req, res) => {
       return res.status(403).json({ error: 'Only creator can delete room' });
     }
 
+    // Delete related data first (cascade handles channels/messages, but not members explicitly if constraint is strict)
+    await pool.query('DELETE FROM room_members WHERE room_id = $1', [roomId]);
     await pool.query('DELETE FROM rooms WHERE id = $1', [roomId]);
     res.json({ success: true });
   } catch (error) {
