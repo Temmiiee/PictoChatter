@@ -78,6 +78,8 @@ class PictoChatApp {
   private peerConnections: Map<number, RTCPeerConnection> = new Map();
   private isMuted = false;
   private deferredPrompt: any = null;
+  private isLoading = false;
+  private isInitialLoad = true;
 
   constructor() {
     this.init();
@@ -396,6 +398,10 @@ class PictoChatApp {
   // ============================================
 
   private async showMainApp(forceFetch = false) {
+    if (this.isInitialLoad) {
+      this.renderLoadingScreen();
+    }
+
     // Optimization: Use cached data if available to avoid click-to-render latency
     if (forceFetch || (this.rooms.length === 0 && this.token)) {
       await this.loadRooms();
@@ -403,6 +409,9 @@ class PictoChatApp {
     if (forceFetch || (this.friends.length === 0 && this.token)) {
       await this.loadFriends();
     }
+
+    this.isInitialLoad = false;
+    this.isLoading = false;
 
     const app = document.getElementById('app')!;
     app.innerHTML = `
@@ -414,12 +423,42 @@ class PictoChatApp {
           </div>
           ${this.renderUserArea()}
         </div>
-        ${this.renderMainContent()}
+        ${this.isLoading ? this.renderLoadingSkeleton() : this.renderMainContent()}
       </div>
     `;
 
     this.setupMainAppListeners();
     this.scrollToBottom();
+  }
+
+  private renderLoadingScreen() {
+    const app = document.getElementById('app')!;
+    app.innerHTML = `
+      <div class="loading-screen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">CHARGEMENT DE PICTOCHATTER...</div>
+      </div>
+    `;
+  }
+
+  private renderLoadingSkeleton(): string {
+    return `
+      <div class="main-content skeleton-loading">
+        <div class="chat-header skeleton"></div>
+        <div class="messages-area">
+          ${Array(5).fill(0).map(() => `
+            <div class="message-group skeleton-item">
+              <div class="message-avatar skeleton-circle"></div>
+              <div class="message-content">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line long"></div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="message-input-area skeleton"></div>
+      </div>
+    `;
   }
 
   private async loadFriends() {
@@ -1487,6 +1526,7 @@ class PictoChatApp {
 
     this.currentChannel = channel;
     this.messages = []; // Clear current messages
+    this.isLoading = true;
 
     if (channel.type === 'text') {
       if (this.socket) {
@@ -1503,10 +1543,13 @@ class PictoChatApp {
         });
         const data = await response.json();
         this.messages = Array.isArray(data) ? data : [];
-        this.renderMessages();
+        this.isLoading = false;
+        this.showMainApp();
       } catch (error) {
         console.error('Error fetching messages:', error);
         this.messages = [];
+        this.isLoading = false;
+        this.showMainApp();
       }
     } else {
       // Voice channel logic
