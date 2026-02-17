@@ -316,6 +316,36 @@ body {
    CHANNEL SIDEBAR (LEFT-CENTER)
    ============================================ */
 
+.channel-actions {
+  display: none;
+  gap: 4px;
+  align-items: center;
+}
+
+.channel-item:hover .channel-actions {
+  display: flex;
+}
+
+.action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 11px;
+  font-family: 'Press Start 2P', monospace;
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.action-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
+.action-btn.delete-channel:hover {
+  color: var(--accent-red);
+}
+
 .channel-sidebar {
   width: var(--channel-list-width);
   background: var(--bg-secondary);

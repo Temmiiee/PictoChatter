@@ -77,6 +77,7 @@ const initDB = async () => {
         room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         type TEXT DEFAULT 'text', -- 'text' or 'voice'
+        position INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -388,7 +389,7 @@ app.get('/api/rooms/:roomId/channels', async (req, res) => {
     if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
 
     const { roomId } = req.params;
-    const channels = await pool.query('SELECT * FROM channels WHERE room_id = $1 ORDER BY created_at ASC', [roomId]);
+    const channels = await pool.query('SELECT * FROM channels WHERE room_id = $1 ORDER BY position ASC, created_at ASC', [roomId]);
     res.json(channels.rows);
   } catch (error) {
     console.error('Get channels error:', error);
@@ -410,14 +411,88 @@ app.post('/api/rooms/:roomId/channels', async (req, res) => {
       return res.status(403).json({ error: 'Only creator can add channels' });
     }
 
+    // Get max position to append
+    const posRes = await pool.query('SELECT COALESCE(MAX(position), 0) as max_pos FROM channels WHERE room_id = $1', [roomId]);
+    const nextPos = posRes.rows[0].max_pos + 1;
+
     const result = await pool.query(
-      'INSERT INTO channels (room_id, name, type) VALUES ($1, $2, $3) RETURNING *',
-      [roomId, name, type || 'text']
+      'INSERT INTO channels (room_id, name, type, position) VALUES ($1, $2, $3, $4) RETURNING *',
+      [roomId, name, type || 'text', nextPos]
     );
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Create channel error:', error);
     res.status(500).json({ error: 'Failed to create channel' });
+  }
+});
+
+app.delete('/api/channels/:channelId', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { channelId } = req.params;
+    const channelRes = await pool.query('SELECT room_id FROM channels WHERE id = $1', [channelId]);
+    if (channelRes.rows.length === 0) return res.status(404).json({ error: 'Channel not found' });
+
+    const roomId = channelRes.rows[0].room_id;
+    const room = await pool.query('SELECT created_by FROM rooms WHERE id = $1', [roomId]);
+    if (room.rows[0].created_by !== decoded.id) {
+      return res.status(403).json({ error: 'Only creator can delete channels' });
+    }
+
+    await pool.query('DELETE FROM channels WHERE id = $1', [channelId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete channel error:', error);
+    res.status(500).json({ error: 'Failed to delete channel' });
+  }
+});
+
+app.patch('/api/rooms/:roomId/channels/reorder', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { roomId } = req.params;
+    const { channelIds } = req.body; // Array of IDs in new order
+
+    const room = await pool.query('SELECT created_by FROM rooms WHERE id = $1', [roomId]);
+    if (room.rows[0].created_by !== decoded.id) {
+       return res.status(403).json({ error: 'Only creator can reorder channels' });
+    }
+
+    for (let i = 0; i < channelIds.length; i++) {
+      await pool.query('UPDATE channels SET position = $1 WHERE id = $2 AND room_id = $3', [i, channelIds[i], roomId]);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reorder channels error:', error);
+    res.status(500).json({ error: 'Failed to reorder channels' });
+  }
+});
+
+app.delete('/api/rooms/:roomId', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { roomId } = req.params;
+    const room = await pool.query('SELECT created_by FROM rooms WHERE id = $1', [roomId]);
+    if (room.rows.length === 0) return res.status(404).json({ error: 'Room not found' });
+    if (room.rows[0].created_by !== decoded.id) {
+      return res.status(403).json({ error: 'Only creator can delete room' });
+    }
+
+    await pool.query('DELETE FROM rooms WHERE id = $1', [roomId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete room error:', error);
+    res.status(500).json({ error: 'Failed to delete room' });
   }
 });
 

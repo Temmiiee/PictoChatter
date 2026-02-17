@@ -509,24 +509,37 @@ class PictoChatApp {
 
   private renderChannelSidebar(): string {
     const roomName = this.currentRoom ? this.currentRoom.name : 'PICTOCHATTER';
+    const isOwner = this.currentRoom && this.currentRoom.created_by === this.user?.id;
     
     return `
       <div class="channel-sidebar">
-        <div class="server-header">
-          <span>${roomName.toUpperCase()}</span>
-          <button class="theme-toggle" id="theme-toggle" title="CHANGER THEME">
-            ${this.darkMode ? '☀' : '🌙'}
-          </button>
+        <div class="server-header" style="position: relative;">
+          <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${roomName.toUpperCase()}</span>
+          <div style="display: flex; gap: 4px; align-items: center;">
+            ${isOwner ? `
+              <button class="icon-btn-small" id="delete-server-trigger" title="SUPPRIMER SERVEUR" style="color: var(--accent-red); padding: 2px 4px; font-size: 10px;">🗑️</button>
+            ` : ''}
+            <button class="theme-toggle" id="theme-toggle" title="CHANGER THEME">
+              ${this.darkMode ? '☀' : '🌙'}
+            </button>
+          </div>
         </div>
         <div class="channel-list">
           ${this.currentRoom ? `
             <div class="channel-category">SALONS</div>
-            ${(this.channels || []).map(channel => {
+            ${(this.channels || []).map((channel, index) => {
               const participants = this.voiceParticipantsMap.get(channel.id) || [];
               return `
-                <div class="channel-item ${this.currentChannel?.id === channel.id ? 'active' : ''}" data-channel-id="${channel.id}">
+                <div class="channel-item ${this.currentChannel?.id === channel.id ? 'active' : ''}" data-channel-id="${channel.id}" style="display: flex; align-items: center;">
                   <span class="channel-icon">${channel.type === 'text' ? '#' : '🔊'}</span>
-                  <span>${channel.name.toUpperCase()}</span>
+                  <span style="flex: 1;">${channel.name.toUpperCase()}</span>
+                  ${isOwner ? `
+                    <div class="channel-actions" style="display: flex; gap: 2px; opacity: 0.5;">
+                      <button class="action-btn delete-channel" data-id="${channel.id}" title="SUPPRIMER">×</button>
+                      <button class="action-btn move-up" data-id="${channel.id}" data-index="${index}" title="MONTER">↑</button>
+                      <button class="action-btn move-down" data-id="${channel.id}" data-index="${index}" title="DESCENDRE">↓</button>
+                    </div>
+                  ` : ''}
                 </div>
                 ${participants.length > 0 ? `
                   <div class="voice-participants" style="padding-left: 24px;">
@@ -540,7 +553,7 @@ class PictoChatApp {
                 ` : ''}
               `;
             }).join('')}
-            ${this.currentRoom.created_by === this.user?.id ? `
+            ${isOwner ? `
               <div class="channel-item" id="add-channel-btn" style="color: var(--text-muted); font-size: 10px; margin-top: 8px;">
                 <span class="channel-icon">+</span>
                 <span>NOUVEAU SALON</span>
@@ -802,6 +815,43 @@ class PictoChatApp {
     if (addServerBtn) {
       addServerBtn.addEventListener('click', () => this.showServerChoiceModal());
     }
+
+    const deleteServerTrigger = document.getElementById('delete-server-trigger');
+    if (deleteServerTrigger) {
+      deleteServerTrigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('Voulez-vous vraiment supprimer ce serveur ? Cette action est irréversible.')) {
+          this.deleteServer();
+        }
+      });
+    }
+
+    // Channel action listeners
+    document.querySelectorAll('.delete-channel').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = parseInt((btn as HTMLElement).dataset.id!);
+        if (confirm('Supprimer ce salon ?')) {
+          this.deleteChannel(id);
+        }
+      });
+    });
+
+    document.querySelectorAll('.move-up').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const index = parseInt((btn as HTMLElement).dataset.index!);
+        this.moveChannel(index, -1);
+      });
+    });
+
+    document.querySelectorAll('.move-down').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const index = parseInt((btn as HTMLElement).dataset.index!);
+        this.moveChannel(index, 1);
+      });
+    });
 
     // Voice controls
     const muteBtn = document.getElementById('mute-btn');
@@ -1660,6 +1710,75 @@ class PictoChatApp {
         alert(error.message);
       }
     });
+  }
+
+  private async deleteServer() {
+    if (!this.currentRoom || !this.token) return;
+    try {
+      const response = await fetch(`${API_URL}/api/rooms/${this.currentRoom.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      if (response.ok) {
+        this.currentRoom = null;
+        this.currentChannel = null;
+        this.channels = [];
+        this.messages = [];
+        await this.loadRooms();
+        this.showMainApp();
+      }
+    } catch (error) {
+      console.error('Error deleting server:', error);
+    }
+  }
+
+  private async deleteChannel(channelId: number) {
+    if (!this.token) return;
+    try {
+      const response = await fetch(`${API_URL}/api/channels/${channelId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      if (response.ok) {
+        if (this.currentChannel?.id === channelId) {
+          this.currentChannel = null;
+          this.messages = [];
+        }
+        if (this.currentRoom) {
+          await this.loadChannels(this.currentRoom.id);
+        }
+        this.showMainApp();
+      }
+    } catch (error) {
+      console.error('Error deleting channel:', error);
+    }
+  }
+
+  private async moveChannel(index: number, direction: number) {
+    if (!this.currentRoom || !this.token) return;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= this.channels.length) return;
+
+    // Swap locally
+    const temp = this.channels[index];
+    this.channels[index] = this.channels[newIndex];
+    this.channels[newIndex] = temp;
+
+    const channelIds = this.channels.map(c => c.id);
+    
+    try {
+      await fetch(`${API_URL}/api/rooms/${this.currentRoom.id}/channels/reorder`, {
+        method: 'PATCH',
+        headers: { 
+          'Authorization': `Bearer ${this.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ channelIds })
+      });
+      this.showMainApp();
+    } catch (error) {
+      console.error('Error reordering channels:', error);
+    }
   }
 
   private escapeHtml(text: string): string {
