@@ -514,12 +514,12 @@ class PictoChatApp {
   private renderServerSidebar(): string {
     return `
       <div class="server-sidebar">
-        <div class="server-icon home active" title="HOME">
-          H
+        <div class="server-icon home ${!this.currentRoom ? 'active' : ''}" title="HOME">
+          <img src="/vite.svg" alt="HOME" style="width: 32px; height: 32px;">
         </div>
         <div class="server-separator"></div>
         ${(this.rooms || []).slice(0, 10).map(room => `
-          <div class="server-icon" data-room-id="${room.id}" title="${room.name}">
+          <div class="server-icon ${this.currentRoom?.id === room.id ? 'active' : ''}" data-room-id="${room.id}" title="${room.name}">
             ${room.name.charAt(0).toUpperCase()}
           </div>
         `).join('')}
@@ -870,6 +870,17 @@ class PictoChatApp {
         }
       });
     });
+
+    const homeBtn = document.querySelector('.server-icon.home');
+    if (homeBtn) {
+      homeBtn.addEventListener('click', () => {
+        this.currentRoom = null;
+        this.currentChannel = null;
+        this.currentFriend = null;
+        this.messages = [];
+        this.showMainApp();
+      });
+    }
 
     // Friend items
     document.querySelectorAll('.friend-item').forEach(item => {
