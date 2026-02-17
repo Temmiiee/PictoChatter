@@ -596,6 +596,9 @@ app.patch('/api/users/profile', async (req, res) => {
     const { avatar_data } = req.body;
     await pool.query('UPDATE users SET avatar_data = $1 WHERE id = $2', [avatar_data, decoded.id]);
     
+    // Broadcast update to all
+    io.emit('user_updated', { id: decoded.id, avatar_data });
+
     res.json({ success: true, avatar_data });
   } catch (error) {
     console.error('Update profile error:', error);
@@ -625,6 +628,27 @@ app.delete('/api/users/profile', async (req, res) => {
 });
 
 // Friends API
+app.get('/api/rooms/:roomId/members', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+    if (!decoded) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { roomId } = req.params;
+    const members = await pool.query(`
+      SELECT u.id, u.username, u.avatar_data
+      FROM users u
+      JOIN room_members rm ON rm.user_id = u.id
+      WHERE rm.room_id = $1
+    `, [roomId]);
+
+    res.json(members.rows);
+  } catch (error) {
+    console.error('Get members error:', error);
+    res.status(500).json({ error: 'Failed to fetch members' });
+  }
+});
+
 app.get('/api/friends', async (req, res) => {
   try {
     const token = req.headers.authorization?.split(' ')[1];

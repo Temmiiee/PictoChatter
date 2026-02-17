@@ -63,6 +63,7 @@ class PictoChatApp {
   private rooms: Room[] = [];
   private friends: Friend[] = [];
   private channels: Channel[] = [];
+  private roomMembers: User[] = [];
   private messages: Message[] = [];
   private isDrawing = false;
   private lastX = 0;
@@ -209,6 +210,29 @@ class PictoChatApp {
       }
     });
 
+    this.socket.on('user_updated', (data: { id: number, avatar_data: string }) => {
+      // Update any matching user in memories
+      if (this.user && this.user.id === data.id) {
+        this.user.avatar_data = data.avatar_data;
+        localStorage.setItem('user', JSON.stringify(this.user));
+      }
+      
+      // Update in friends list
+      const friend = this.friends.find(f => f.id === data.id);
+      if (friend) friend.avatar_data = data.avatar_data;
+      
+      // Update in room members
+      const member = this.roomMembers.find(m => m.id === data.id);
+      if (member) member.avatar_data = data.avatar_data;
+
+      // Update in messages currently displayed
+      this.messages.forEach(msg => {
+        if (msg.user_id === data.id) msg.avatar_data = data.avatar_data;
+      });
+
+      this.showMainApp();
+    });
+
     this.socket.on('user_joined', (data: { username: string }) => {
       this.addSystemMessage(`${data.username} joined`);
     });
@@ -284,7 +308,15 @@ class PictoChatApp {
   private scrollToBottom() {
     const messagesArea = document.querySelector('.messages-area');
     if (messagesArea) {
+      // Immediate scroll
       messagesArea.scrollTop = messagesArea.scrollHeight;
+      // Delayed scroll for images/rendering settle
+      setTimeout(() => {
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+      }, 50);
+      requestAnimationFrame(() => {
+        messagesArea.scrollTop = messagesArea.scrollHeight;
+      });
     }
   }
 
@@ -482,8 +514,8 @@ class PictoChatApp {
       <div class="main-content">
         <div class="chat-header" style="display: flex; align-items: center; gap: 8px;">
           <span class="channel-hash">${this.currentChannel ? '#' : (this.currentRoom ? '#' : '@')}</span>
-          <span style="flex-grow: 1;">${headerTitle.toUpperCase()}</span>
-          ${this.currentFriend ? `<button id="call-friend-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 14px;">📞 APPELER</button>` : ''}
+          <span style="flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${headerTitle.toUpperCase()}</span>
+          ${this.currentFriend ? `<button id="call-friend-btn" class="btn-secondary" style="padding: 4px 8px; font-size: 14px; margin-right: 8px;">📞 APPELER</button>` : ''}
           <span style="font-size: 7px; color: var(--text-muted);">${headerInfo}</span>
         </div>
         <div class="messages-area" id="messages-area">
@@ -492,6 +524,21 @@ class PictoChatApp {
         ${this.renderMessageInput()}
         ${this.activeVoiceChannel && this.currentChannel?.id !== this.activeVoiceChannel.id ? this.renderVoiceOverlay() : ''}
       </div>
+      ${this.currentRoom ? `
+        <div class="right-panel">
+          <div class="member-list">
+            <div class="member-category">MEMBRES — ${this.roomMembers.length}</div>
+            ${this.roomMembers.map(member => `
+              <div class="member-item">
+                <div class="member-avatar" style="${member.avatar_data ? `background-image: url(${member.avatar_data})` : ''}">
+                  ${!member.avatar_data ? member.username.charAt(0).toUpperCase() : ''}
+                </div>
+                <div class="member-name">${member.username.toUpperCase()}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
     `;
   }
 
@@ -637,12 +684,9 @@ class PictoChatApp {
         `;
       } else {
         html += `
-          <div class="message-group">
-            <div class="message-avatar" style="opacity: 0;"></div>
+          <div class="message-group" style="padding-top: 0; padding-bottom: 0;">
+            <div class="message-avatar" style="visibility: hidden; height: 0; width: 40px;"></div>
             <div class="message-content">
-              <div class="message-header" style="opacity: 0;">
-                <span class="message-time">${time}</span>
-              </div>
               ${msg.message ? `<div class="message-text">${this.escapeHtml(msg.message)}</div>` : ''}
               ${msg.drawing_data ? `
                 <div class="message-drawing">
@@ -1391,17 +1435,37 @@ class PictoChatApp {
     }
   }
 
+  private async loadMembers(roomId: number) {
+    if (!this.token) return;
+    try {
+      const response = await fetch(`${API_URL}/api/rooms/${roomId}/members`, {
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      if (response.status === 401) return this.handleUnauthorized();
+      const data = await response.json();
+      this.roomMembers = Array.isArray(data) ? data : [];
+      this.showMainApp();
+    } catch (error) {
+      console.error('Error fetching members:', error);
+      this.roomMembers = [];
+    }
+  }
+
   private async joinRoom(room: Room) {
     this.currentRoom = room;
     this.currentFriend = null;
+    this.roomMembers = [];
 
     // Join socket room immediately
     if (this.socket) {
       this.socket.emit('join_room', room.id);
     }
 
-    // Load channels
-    await this.loadChannels(room.id);
+    // Load channels and members
+    await Promise.all([
+      this.loadChannels(room.id),
+      this.loadMembers(room.id)
+    ]);
     
     // Auto-join first text channel
     const textChannel = this.channels.find(c => c.type === 'text');
