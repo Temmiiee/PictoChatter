@@ -183,6 +183,14 @@ class PictoChatApp {
       if (this.token) {
         this.socket!.emit('authenticate', this.token);
       }
+      
+      // Re-join active sessions on reconnect
+      if (this.currentRoom) {
+        this.socket!.emit('join_room', this.currentRoom.id);
+      }
+      if (this.currentChannel) {
+        this.socket!.emit('join_channel', this.currentChannel.id);
+      }
     });
 
     this.socket.on('new_message', (message: Message) => {

@@ -835,11 +835,12 @@ io.on('connection', (socket) => {
 
   socket.on('join_channel', (channelId) => {
     socket.join(`channel_${channelId}`);
-    console.log(`${socket.username} joined channel ${channelId}`);
+    console.log(`Socket ${socket.id} (${socket.username || 'Anon'}) joined channel ${channelId}`);
   });
 
   socket.on('leave_channel', (channelId) => {
     socket.leave(`channel_${channelId}`);
+    console.log(`Socket ${socket.id} (${socket.username || 'Anon'}) left channel ${channelId}`);
   });
 
   // Voice Chat
