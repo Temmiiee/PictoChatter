@@ -708,11 +708,17 @@ class PictoChatApp {
     // Logout
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
-      logoutBtn.addEventListener('click', () => {
+      logoutBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent opening profile modal
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         this.token = null;
         this.user = null;
+        this.rooms = [];
+        this.friends = [];
+        this.currentRoom = null;
+        this.currentFriend = null;
+        this.currentChannel = null;
         if (this.socket) {
           this.socket.disconnect();
         }
