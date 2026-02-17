@@ -1,7 +1,10 @@
 import './style.css';
 import { io, Socket } from 'socket.io-client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? 'http://localhost:3000' 
+    : window.location.origin);
 
 interface User {
   id: number;
@@ -101,11 +104,32 @@ class PictoChatApp {
   private renderInstallButton() {
     const installBtn = document.getElementById('install-app-btn');
     if (installBtn) {
-      if (this.deferredPrompt) {
-        installBtn.style.display = 'block';
+      // Always show the button, but its functionality depends on deferredPrompt
+      installBtn.style.display = 'block'; 
+      if (!this.deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
+        // Optional: Can make the button inactive or show a message if not installable
+        installBtn.classList.add('disabled'); // Example: add a disabled class
+        installBtn.title = "L'application est déjà installée ou votre navigateur ne supporte pas l'installation directe.";
       } else {
-        installBtn.style.display = 'none';
+        installBtn.classList.remove('disabled');
+        installBtn.title = "Installer l'application";
       }
+
+      installBtn.onclick = () => {
+        if (this.deferredPrompt) {
+          this.deferredPrompt.prompt();
+          this.deferredPrompt.userChoice.then((choice: any) => {
+            if (choice.outcome === 'accepted') {
+              console.log('User accepted the install prompt');
+              installBtn.style.display = 'none'; // Hide button after successful install
+            }
+            this.deferredPrompt = null;
+            this.renderInstallButton(); // Re-render to update state
+          });
+        } else if (!window.matchMedia('(display-mode: standalone)').matches) {
+          alert("L'application est déjà installée ou votre navigateur ne supporte pas l'installation directe. Utilisez le menu de votre navigateur ('Ajouter à l'écran d'accueil').");
+        }
+      };
     }
   }
 
@@ -351,8 +375,13 @@ class PictoChatApp {
     const app = document.getElementById('app')!;
     app.innerHTML = `
       <div class="app-container">
-        ${this.renderServerSidebar()}
-        ${this.renderChannelSidebar()}
+        <div class="left-panel">
+          <div class="sidebars-container">
+            ${this.renderServerSidebar()}
+            ${this.renderChannelSidebar()}
+          </div>
+          ${this.renderUserArea()}
+        </div>
         ${this.renderMainContent()}
       </div>
     `;
@@ -405,9 +434,12 @@ class PictoChatApp {
     if (!this.currentRoom && !this.currentFriend) {
       return `
         <div class="main-content">
-          <div class="empty-state" style="height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-            <div class="empty-state-text" style="font-size: 14px; margin-bottom: 16px;">BIENVENUE SUR PICTOCHATTER</div>
-            <div class="empty-state-text" style="margin-bottom: 24px;">REJOIGNEZ UN SALON OU UN AMI</div>
+          <div class="empty-state">
+            <div class="home-box">
+              <div class="empty-state-text">BIENVENUE SUR PICTOCHATTER</div>
+              <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: var(--space-md);">REJOIGNEZ UN SERVEUR OU UN AMI POUR COMMENCER</div>
+              <button class="btn-primary" id="install-app-btn" style="padding: 12px 24px; font-size: 12px; margin-top: 10px;">INSTALLER L'APPLICATION</button>
+            </div>
           </div>
         </div>
       `;
@@ -531,14 +563,19 @@ class PictoChatApp {
             `).join('')}
           `}
         </div>
-        <div class="user-area">
-          <div class="user-info-wrapper" id="user-profile-trigger" style="display: flex; align-items: center; cursor: pointer;">
-            <div class="user-avatar-small" style="${this.user?.avatar_data ? `background-image: url(${this.user.avatar_data})` : ''}">
-              ${!this.user?.avatar_data ? this.user?.username.charAt(0).toUpperCase() : ''}
-            </div>
-            <div class="user-info">${this.user!.username.toUpperCase()}</div>
+      </div>
+    `;
+  }
+
+  private renderUserArea(): string {
+    return `
+      <div class="user-area-full">
+        <div class="user-box" id="user-profile-trigger">
+          <div class="user-avatar-small" style="${this.user?.avatar_data ? `background-image: url(${this.user.avatar_data})` : ''}">
+            ${!this.user?.avatar_data ? this.user?.username.charAt(0).toUpperCase() : ''}
           </div>
-          <button class="logout-btn" id="logout-btn">QUITTER</button>
+          <div class="user-info">${this.user!.username.toUpperCase()}</div>
+          <button class="logout-btn" id="logout-btn">DÉCONNECTER</button>
         </div>
       </div>
     `;
@@ -1032,7 +1069,7 @@ class PictoChatApp {
             ${!this.user?.avatar_data ? this.user?.username.charAt(0).toUpperCase() : ''}
           </div>
           <div class="user-info" style="font-size: 16px;">${this.user?.username.toUpperCase()}</div>
-          <div class="friend-code-display" style="font-size: 10px; color: var(--text-muted); margin-top: -8px;"># ${this.user?.friend_code}</div>
+          <div class="friend-code-display" style="font-size: 10px; color: var(--text-muted); margin-top: -8px;">#${this.user?.friend_code}</div>
           
           <input type="file" id="avatar-input" style="display: none;" accept="image/*">
           
@@ -1526,12 +1563,12 @@ class PictoChatApp {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal-content">
-        <div class="modal-title">CREER UN SALON</div>
+        <div class="modal-title">CRÉER UN SERVEUR</div>
         <form class="modal-form" id="create-room-form">
-          <input type="text" class="input-field" id="room-name" placeholder="NOM DU SALON" required>
+          <input type="text" class="input-field" id="room-name" placeholder="NOM DU SERVEUR" required>
           <div class="modal-actions">
             <button type="button" class="btn-secondary" id="cancel-btn">ANNULER</button>
-            <button type="submit" class="btn-primary">CREER</button>
+            <button type="submit" class="btn-primary">CRÉER</button>
           </div>
         </form>
       </div>
@@ -1573,7 +1610,7 @@ class PictoChatApp {
     modal.className = 'modal-overlay';
     modal.innerHTML = `
       <div class="modal-content">
-        <div class="modal-title">REJOINDRE UN SALON</div>
+        <div class="modal-title">REJOINDRE UN SERVEUR</div>
         <form class="modal-form" id="join-room-form">
           <input type="text" class="input-field" id="room-code" placeholder="ENTREZ LE CODE" required maxlength="6">
           <div class="modal-actions">
