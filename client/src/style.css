@@ -1127,6 +1127,99 @@ body {
   font-weight: bold;
 }
 
+.mobile-menu-toggle {
+  display: none; /* Hidden by default on desktop */
+}
+
+/* ============================================
+   LOADING & SKELETON SCREENS
+   ============================================ */
+
+.loading-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+.loading-text {
+  font-size: 14px;
+  font-family: 'Press Start 2P', monospace;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Skeleton Loading */
+.skeleton-loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.skeleton {
+  background: var(--bg-tertiary);
+  animation: shimmer 1.5s infinite linear;
+  background: linear-gradient(to right, var(--bg-tertiary) 4%, var(--bg-secondary) 25%, var(--bg-tertiary) 36%);
+  background-size: 1000px 100%;
+}
+
+.skeleton-item {
+  display: flex;
+  gap: var(--space-md);
+  padding: 4px 16px;
+  align-items: flex-start;
+}
+
+.skeleton-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px; /* Keeping retro style */
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.skeleton-line {
+  height: 12px;
+  background: var(--bg-tertiary);
+  margin-bottom: 8px;
+  border-radius: 2px;
+}
+
+.skeleton-line.short {
+  width: 30%;
+}
+
+.skeleton-line.long {
+  width: 80%;
+}
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
 
 /* ============================================
    RESPONSIVE
@@ -1140,7 +1233,7 @@ body {
   .server-icon {
     width: 48px;
     height: 48px;
-    font-size: 24px; /* Maintain visibility */
+    font-size: 24px;
   }
 
   .channel-sidebar {
@@ -1150,105 +1243,54 @@ body {
   .message-avatar {
     width: 32px;
     height: 32px;
-    font-size: 12px; /* Minimum 12px */
+    font-size: 12px;
   }
 
-  /* ============================================
-   LOADING & SKELETON SCREENS
-   ============================================ */
+  .right-panel {
+    display: none; /* Hide member list on tablet/mobile by default */
+  }
 
-  .loading-screen {
-    width: 100vw;
-    height: 100vh;
+  .mobile-menu-toggle {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-  }
-
-  .loading-spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid var(--border-color);
-    border-top-color: var(--accent-blue);
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: var(--accent-blue);
+    color: white;
+    border: 2px solid var(--text-primary);
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 16px;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    z-index: 1000;
+    box-shadow: 4px 4px 0 rgba(0,0,0,0.5);
+    cursor: pointer;
   }
 
-  .loading-text {
-    font-size: 14px;
-    font-family: 'Press Start 2P', monospace;
-    animation: pulse 1.5s ease-in-out infinite;
+  .left-panel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 999;
+    background: var(--bg-primary);
+    transform: translateX(0);
+    transition: transform 0.3s ease;
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
+  .left-panel.mobile-hidden {
+    transform: translateX(-100%);
   }
 
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-
-  /* Skeleton Loading */
-  .skeleton-loading {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .skeleton {
-    background: var(--bg-tertiary);
-    animation: shimmer 1.5s infinite linear;
-    background: linear-gradient(to right, var(--bg-tertiary) 4%, var(--bg-secondary) 25%, var(--bg-tertiary) 36%);
-    background-size: 1000px 100%;
-  }
-
-  .skeleton-item {
-    display: flex;
-    gap: var(--space-md);
-    padding: 4px 16px;
-    align-items: flex-start;
-  }
-
-  .skeleton-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 4px; /* Keeping retro style */
-    background: var(--bg-tertiary);
-    flex-shrink: 0;
-  }
-
-  .skeleton-line {
-    height: 12px;
-    background: var(--bg-tertiary);
-    margin-bottom: 8px;
-    border-radius: 2px;
-  }
-
-  .skeleton-line.short {
-    width: 30%;
-  }
-
-  .skeleton-line.long {
-    width: 80%;
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -1000px 0; }
-    100% { background-position: 1000px 0; }
+  .left-panel.mobile-visible {
+    transform: translateX(0);
+    box-shadow: 4px 0 10px rgba(0,0,0,0.5);
   }
 }
 
 @media (max-width: 480px) {
-  .server-sidebar {
-    display: none;
-  }
-
   .channel-sidebar {
     width: 180px;
   }

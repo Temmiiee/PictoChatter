@@ -107,32 +107,23 @@ class PictoChatApp {
   private renderInstallButton() {
     const installBtn = document.getElementById('install-app-btn');
     if (installBtn) {
-      // Always show the button, but its functionality depends on deferredPrompt
-      installBtn.style.display = 'block'; 
-      if (!this.deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
-        // Optional: Can make the button inactive or show a message if not installable
-        installBtn.classList.add('disabled'); // Example: add a disabled class
-        installBtn.title = "L'application est déjà installée ou votre navigateur ne supporte pas l'installation directe.";
-      } else {
+      if (this.deferredPrompt) {
+        installBtn.style.display = 'block';
         installBtn.classList.remove('disabled');
         installBtn.title = "Installer l'application";
-      }
-
-      installBtn.onclick = () => {
-        if (this.deferredPrompt) {
+        installBtn.onclick = () => {
           this.deferredPrompt.prompt();
           this.deferredPrompt.userChoice.then((choice: any) => {
             if (choice.outcome === 'accepted') {
               console.log('User accepted the install prompt');
-              installBtn.style.display = 'none'; // Hide button after successful install
+              installBtn.style.display = 'none';
             }
             this.deferredPrompt = null;
-            this.renderInstallButton(); // Re-render to update state
           });
-        } else if (!window.matchMedia('(display-mode: standalone)').matches) {
-          alert("L'application est déjà installée ou votre navigateur ne supporte pas l'installation directe. Utilisez le menu de votre navigateur ('Ajouter à l'écran d'accueil').");
-        }
-      };
+        };
+      } else {
+        installBtn.style.display = 'none';
+      }
     }
   }
 
@@ -414,9 +405,11 @@ class PictoChatApp {
     this.isLoading = false;
 
     const app = document.getElementById('app')!;
+    const isMobile = window.innerWidth <= 768;
+
     app.innerHTML = `
       <div class="app-container">
-        <div class="left-panel">
+        <div class="left-panel ${isMobile ? 'mobile-hidden' : ''}" id="left-panel">
           <div class="sidebars-container">
             ${this.renderServerSidebar()}
             ${this.renderChannelSidebar()}
@@ -424,11 +417,37 @@ class PictoChatApp {
           ${this.renderUserArea()}
         </div>
         ${this.isLoading ? this.renderLoadingSkeleton() : this.renderMainContent()}
+        ${isMobile ? `
+          <button id="mobile-menu-toggle" class="mobile-menu-toggle">☰</button>
+        ` : ''}
       </div>
     `;
 
     this.setupMainAppListeners();
     this.scrollToBottom();
+    this.renderInstallButton();
+
+    if (isMobile) {
+      document.getElementById('mobile-menu-toggle')?.addEventListener('click', () => {
+        const leftPanel = document.getElementById('left-panel');
+        leftPanel?.classList.toggle('mobile-visible');
+        leftPanel?.classList.toggle('mobile-hidden');
+      });
+      
+      // Close menu when clicking outside or on a channel/server
+      document.addEventListener('click', (e) => {
+        const leftPanel = document.getElementById('left-panel');
+        const toggleBtn = document.getElementById('mobile-menu-toggle');
+        const target = e.target as HTMLElement;
+        
+        if (leftPanel?.classList.contains('mobile-visible') && 
+            !leftPanel.contains(target) && 
+            target !== toggleBtn) {
+          leftPanel.classList.remove('mobile-visible');
+          leftPanel.classList.add('mobile-hidden');
+        }
+      });
+    }
   }
 
   private renderLoadingScreen() {
