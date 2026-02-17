@@ -189,6 +189,10 @@ class PictoChatApp {
       this.messages.push(message);
       this.renderMessages();
       this.scrollToBottom();
+      
+      if (this.user && message.user_id !== this.user.id) {
+        this.playMessageSound();
+      }
     });
 
     this.socket.on('new_direct_message', (message: Message) => {
@@ -200,6 +204,10 @@ class PictoChatApp {
         // Notify user about new DM
         console.log('New DM from:', message.username);
         this.loadFriends(); // Refresh to show unread or something
+      }
+      
+      if (this.user && message.sender_id !== this.user.id) {
+        this.playMessageSound();
       }
     });
 
@@ -1939,6 +1947,30 @@ class PictoChatApp {
       oscillator.stop(audioCtx.currentTime + 0.3);
     } catch (e) {
       console.error('Error playing sound:', e);
+    }
+  }
+
+  private playMessageSound() {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      // Higher pitched short blip for messages
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5
+      oscillator.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.1); // A6
+
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch (e) {
+      // Silent fail
     }
   }
 }
