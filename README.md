@@ -438,5 +438,4 @@ PictoChatter/
 - [ ] Indicateurs de statut utilisateur
 - [ ] Modification de messages
 - [ ] Partage de fichiers (Photos/Vidéos)
-- [ ] Paramètres de serveur avancés#   P i c t o C h a t t e r  
- 
+- [ ] Paramètres de serveur avancés
