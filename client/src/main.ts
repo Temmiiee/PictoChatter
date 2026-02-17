@@ -806,6 +806,10 @@ class PictoChatApp {
     if (logoutBtn) {
       logoutBtn.addEventListener('click', (e) => {
         e.stopPropagation(); // Prevent opening profile modal
+        
+        // Close any open modals
+        document.querySelectorAll('.modal-overlay').forEach(modal => modal.remove());
+
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         this.token = null;
@@ -1572,6 +1576,7 @@ class PictoChatApp {
       if (this.socket) {
         this.socket.emit('join_voice', channel.id);
       }
+      this.playConnectSound();
       this.showMainApp();
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -1606,6 +1611,7 @@ class PictoChatApp {
       console.log(`Joining private call ${callId} with ${targetUserId}`);
       this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       this.activeVoiceChannel = { id: 0, name: 'APPEL PRIVE', room_id: 0, type: 'voice' }; // Pseudo channel for call
+      this.playConnectSound();
       this.showMainApp();
     } catch (error) {
       console.error('Error accessing microphone:', error);
@@ -1892,6 +1898,29 @@ class PictoChatApp {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  private playConnectSound() {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, audioCtx.currentTime); // A4
+      oscillator.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1); // Slide up to A5
+
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+
+      oscillator.start();
+      oscillator.stop(audioCtx.currentTime + 0.3);
+    } catch (e) {
+      console.error('Error playing sound:', e);
+    }
   }
 }
 
