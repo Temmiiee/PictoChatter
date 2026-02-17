@@ -1235,7 +1235,12 @@ class PictoChatApp {
       });
 
       messageInput.value = '';
-      // NOTE: We don't clear the canvas automatically as per user request
+      
+      // Close drawing mode if a drawing was sent
+      if (drawingData) {
+        this.showDrawingMode = false;
+        this.toggleDrawingModeUI();
+      }
     }
   }
 
