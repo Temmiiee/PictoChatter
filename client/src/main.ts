@@ -507,7 +507,6 @@ class PictoChatApp {
       this.friends = Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching friends:', error);
-      this.friends = [];
     }
   }
 
@@ -1509,7 +1508,6 @@ class PictoChatApp {
       this.rooms = Array.isArray(data) ? data : [];
     } catch (error) {
       console.error('Error fetching rooms:', error);
-      this.rooms = [];
     }
   }
 

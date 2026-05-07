@@ -19,6 +19,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1); // Required for Render/proxied deployments (rate limiter + real IPs)
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
@@ -38,8 +39,13 @@ let connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
   connectionString: connectionString,
-  ssl: connectionString && !connectionString.includes('localhost') ? { rejectUnauthorized: false } : false
+  ssl: connectionString && !connectionString.includes('localhost') ? { rejectUnauthorized: false } : false,
+  max: 5,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
+
+pool.on('error', (err) => console.error('DB pool error:', err));
 
 // Helper to generate a random 6-digit friend code
 const generateFriendCode = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -809,8 +815,14 @@ io.on('connection', (socket) => {
   socket.on('join_room', (roomId) => {
     socket.join(`room_${roomId}`);
     console.log(`${socket.username} joined room ${roomId}`);
-    
-    // Notify others in the room
+
+    // Send current voice state to the joining user
+    voiceUsers.forEach((users, channelId) => {
+      if (users.size > 0) {
+        socket.emit('voice_users_update', { channelId, participants: getVoiceParticipants(channelId) });
+      }
+    });
+
     socket.to(`room_${roomId}`).emit('user_joined', {
       username: socket.username,
       timestamp: new Date().toISOString()
