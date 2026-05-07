@@ -36,15 +36,9 @@ const { Pool } = pg;
 
 let connectionString = process.env.DATABASE_URL;
 
-// Add SSL for all remote connections (Supabase, Render, etc.)
-if (connectionString && !connectionString.includes('sslmode') && !connectionString.includes('localhost')) {
-  const separator = connectionString.includes('?') ? '&' : '?';
-  connectionString += `${separator}sslmode=require`;
-}
-
 const pool = new Pool({
   connectionString: connectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl: connectionString && !connectionString.includes('localhost') ? { rejectUnauthorized: false } : false
 });
 
 // Helper to generate a random 6-digit friend code
