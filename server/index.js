@@ -36,10 +36,10 @@ const { Pool } = pg;
 
 let connectionString = process.env.DATABASE_URL;
 
-// Satisfy production SSL warnings (uselibpqcompat and sslmode=require)
-if (connectionString && !connectionString.includes('sslmode') && connectionString.includes('render.com')) {
+// Add SSL for all remote connections (Supabase, Render, etc.)
+if (connectionString && !connectionString.includes('sslmode') && !connectionString.includes('localhost')) {
   const separator = connectionString.includes('?') ? '&' : '?';
-  connectionString += `${separator}uselibpqcompat=true&sslmode=require`;
+  connectionString += `${separator}sslmode=require`;
 }
 
 const pool = new Pool({
